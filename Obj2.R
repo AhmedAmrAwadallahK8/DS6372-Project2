@@ -12,33 +12,33 @@ source("Utility.r")
 
 glow_bonemed_raw = glow_bonemed
 
-#Variables we chose from our EDA process
-variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
-                      "raterisk", "fracscore", "bonemed", "bonemed_fu", 
-                      "bonetreat", "height", "fracture")
-
-glow_bonemed_raw = glow_bonemed %>% select(variablesToSelect)
-
-str(glow_bonemed_raw)
-
-#Standardize Data
-glow_bonemed_std = get_standardized_df(glow_bonemed_raw, c("age", "fracscore", "height"))
-str(glow_bonemed_std)
+#Don't need to do much cleaning we know this data is overall fine
+#Remove features that should not be used in the model
+#Choose variables
+variablesToRemove = c("sub_id", "site_id")
+glow_bonemed_raw = glow_bonemed_raw %>% select(-variablesToRemove)
 
 #Split into training and test set
 set.seed(2)
-train_test_list = train_test_split(glow_bonemed_std , 0.8)
-train = train_test_list[[1]]
-test = train_test_list[[2]]
+train_test_list = train_test_split(glow_bonemed_raw , 0.8)
+raw_train = train_test_list[[1]]
+raw_test = train_test_list[[2]]
 
 #Through our EDA we know the data is mostly clean we just need to handle the
 #data imbalance
 
-train %>% ggplot(aes(x=fracture)) + geom_bar()
-train = get_df_with_upsampled_class(train, "fracture", "Yes", 3)
-train %>% ggplot(aes(x=fracture)) + geom_bar()
+raw_train %>% ggplot(aes(x=fracture)) + geom_bar()
+raw_train = get_df_with_upsampled_class(raw_train, "fracture", "Yes", 3)
+raw_train %>% ggplot(aes(x=fracture)) + geom_bar()
 
 #Lasso for feature selection
+
+#Lasso Prefers Standardized Data
+cts_vars = c("phy_id", "age", "weight", "height", "bmi", "fracscore")
+train = get_standardized_df(train, cts_vars)
+test = get_standardized_df(test, cts_vars)
+
+#Lasso Protocol
 TrainFeatures = train
 TrainFeatures = model.matrix(fracture~.,TrainFeatures)[,-1]
 TrainTarget = train$fracture
@@ -67,7 +67,7 @@ auc = auc_holder@y.values[[1]]
 auc
 
 
-#No feature was dropped out so keep them all
+#Weight was dropped by Lasso
 
 #Start Model Building Process
 model_compare_df = data.frame(model_num = c(0), auc=c(0), balanced_accuracy=c(0))
@@ -75,6 +75,20 @@ model_compare_df
 model_num = 0
 
 #Model 1: Simple
+
+#Var Selection based on our EDA and Lasso
+variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
+                      "raterisk", "fracscore", "bonemed", "bonemed_fu", 
+                      "bonetreat", "height", "fracture")
+train = raw_train %>% select(variablesToSelect)
+test = raw_test %>% select(variablesToSelect)
+
+#Standardize Data
+cts_vars = c("age", "height")
+train = get_standardized_df(train, cts_vars)
+test = get_standardized_df(test, cts_vars)
+
+#Model
 model_num = model_num + 1
 model=glm(fracture~.,family="binomial",data=train)
 summary(model)
@@ -96,6 +110,19 @@ model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
 #Model 2: Remove values that were not significant
+#Var Selection
+variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
+                      "raterisk", "fracscore", "bonemed", "bonemed_fu", 
+                      "bonetreat", "height", "fracture")
+train = raw_train %>% select(variablesToSelect)
+test = raw_test %>% select(variablesToSelect)
+
+#Standardize Data
+cts_vars = c("age", "height")
+train = get_standardized_df(train, cts_vars)
+test = get_standardized_df(test, cts_vars)
+
+#Model
 model_num = model_num + 1
 model=glm(fracture~
              priorfrac+
@@ -126,6 +153,19 @@ model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
 #Model 3: Cts Interaction using stepwise approach
+#Var Selection
+variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
+                      "raterisk", "fracscore", "bonemed", "bonemed_fu", 
+                      "bonetreat", "height", "fracture")
+train = raw_train %>% select(variablesToSelect)
+test = raw_test %>% select(variablesToSelect)
+
+#Standardize Data
+cts_vars = c("age", "height")
+train = get_standardized_df(train, cts_vars)
+test = get_standardized_df(test, cts_vars)
+
+#Model
 model_num = model_num + 1
 model=glm(fracture~
              priorfrac+
@@ -155,7 +195,9 @@ model_stats = c(model_num, auc, balanced_acc)
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
-#Model 4: QDA
+#Model 4: Non Standardized Data (If We have time)
+
+#Model 5: QDA
 model_num = model_num + 1
 model=glm(fracture~
             priorfrac+
@@ -185,16 +227,26 @@ model_stats = c(model_num, auc, balanced_acc)
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
-#Model 5: Nonparametric (Random Forest)
+#Model 6: Nonparametric (Random Forest)
 model_num = model_num + 1
 
-features = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
-                      "raterisk", "fracscore", "bonemed", "bonemed_fu", 
-                      "bonetreat", "height")
+#Var Selection
+train = raw_train
+test = raw_test
+
+#Standardize Data
+cts_vars = c("phy_id", "age", "weight", "height", "bmi", "fracscore")
+train = get_standardized_df(train, cts_vars)
+test = get_standardized_df(test, cts_vars)
+
+#Specify Features and Target
+features = c("phy_id", "priorfrac", "age", "weight", "bmi", "permeno", 
+             "momfrac", "armassist", "smoke", "raterisk", "fracscore", 
+             "bonemed", "bonemed_fu", "bonetreat", "height")
 target = c("fracture")
 
 #Find Optimal Depth
-optimal_d = find_optimal_depth(train, test, features, target, d_max=60)
+optimal_d = find_optimal_depth(train, test, features, target, d_max=30)
 
 #Setup train and test data
 train_fea = train %>% select(contains(features))
@@ -207,58 +259,6 @@ model = randomForest(x=train_fea, y=train_tar$fracture,
                       ntree = 1000, maxnodes = optimal_d)
 
 #Roc and AUC: Have to make custom func for this
-auc = -1
-
-#Best Threshold using Balanced Accuracy
-pred_forest = predict(model, test_fea)
-CM_rep = confusionMatrix(table(pred_forest, test$fracture))
-CM_rep
-balanced_acc = CM_rep$byClass[11]
-
-#Update Model Comparison Dataframe
-model_stats = c(model_num, auc, balanced_acc)
-model_compare_df = rbind(model_compare_df, model_stats)
-model_compare_df
-
-#Model 6: Nonparametric (Random Forest) All Variables In Dataset
-#NOT DONE YET
-#phy_id: Physician ID code (128 unique codes)
-#priorfrac: History of Prior Fracture (no, Yes)
-#age: age at enrollment (Years)
-#height: height at enrollment (centimeter)
-#weight: Weight at enrollment (kg)
-#bmi: body mass index (kg/m^2)
-#premeno: Menopause before age 45 (no, Yes)
-#momfrac: Mother had hip fracture (no, yes)
-#armassist: Arms are needed to stand frm chair (no, yes)
-#smoke: form or current smoker (no, yes)
-#raterisk: self-reported risk of frac (Less than others of same, same as others of the same age, greater than others of the same age)
-#fracscore: Fracture Risk Score (Composite Risk Score)
-#bonemed: bone medications at enroll (no, yes)
-#bonemed_fu: bone meds at follow up (no, yes)
-#bonetreat: bone med both at enroll and follow (no, yes)
-#fracture: any fracture in first year (no, yes) TARGET
-model_num = model_num + 1
-
-features = c("phy_id", "priorfrac", "age", "momfrac", "armassist", "smoke", 
-             "raterisk", "fracscore", "bonemed", "bonemed_fu", 
-             "bonetreat", "height")
-target = c("fracture")
-
-#Find Optimal Depth
-optimal_d = find_optimal_depth(train, test, features, target, d_max=60)
-
-#Setup train and test data
-train_fea = train %>% select(contains(features))
-train_tar = train %>% select(contains(target))
-test_fea = test %>% select(contains(features))
-test_tar = test %>% select(contains(target))
-
-#Build Final Model
-model = randomForest(x=train_fea, y=train_tar$fracture,
-                     ntree = 1000, maxnodes = optimal_d)
-
-#Roc and AUC
 auc = -1
 
 #Best Threshold using Balanced Accuracy
