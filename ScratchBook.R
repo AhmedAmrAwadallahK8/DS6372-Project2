@@ -1,4 +1,54 @@
 #Random Code
+#Model 2: Remove values that were not significant
+model_description = "Simple Log + Significant Features"
+
+#Var Selection
+variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
+                      "raterisk", "fracscore", "bonemed", "bonemed_fu", 
+                      "bonetreat", "height", "fracture")
+train = raw_train %>% select(variablesToSelect)
+test = raw_test %>% select(variablesToSelect)
+
+#Standardize Data
+cts_vars = c("age", "height")
+train = get_standardized_df(train, cts_vars)
+test = get_standardized_df(test, cts_vars)
+
+#Model
+model_num = model_num + 1
+model=glm(fracture~
+            priorfrac+
+            age+
+            momfrac+
+            armassist+
+            raterisk+
+            bonemed+
+            bonetreat+
+            height,
+          family="binomial",data=train)
+summary(model)
+
+#Roc and AUC
+auc = plot_roc_and_get_auc(model, test, "fracture")
+
+#Best Threshold using Balanced Acc
+preds = unname(predict(model, test, type="response"))
+best_threshold = get_and_plot_best_threshold(preds, test$fracture)
+class_preds = ifelse(preds > best_threshold,"Yes","No")
+CM_rep = confusionMatrix(table(class_preds, test$fracture))
+CM_rep
+balanced_acc = CM_rep$byClass[11]
+sens = CM_rep$byClass[1]
+spec = CM_rep$byClass[2]
+precision = CM_rep$byClass[5]
+recall = CM_rep$byClass[6]
+f1 = get_f1(precision, recall)
+
+#Update Model Comparison Dataframe
+model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
+model_compare_df = rbind(model_compare_df, model_stats)
+model_compare_df
+
 anova(model, test="Chisq")
 
 #Simple Model

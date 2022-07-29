@@ -22,7 +22,7 @@ variablesToRemove = c("sub_id", "site_id")
 glow_bonemed_raw = glow_bonemed_raw %>% select(-variablesToRemove)
 
 #Split into training and test set
-set.seed(2)
+set.seed(1234)
 train_test_list = train_test_split(glow_bonemed_raw , 0.8)
 raw_train = train_test_list[[1]]
 raw_test = train_test_list[[2]]
@@ -73,7 +73,7 @@ auc
 #Weight was dropped by Lasso
 
 #Start Model Building Process
-model_compare_df = data.frame(model_num = c(0), model_description = c("Null Model"), auc=c(0), balanced_accuracy=c(0)
+model_compare_df = data.frame(model_num = c(0), model_description = c("Null Model"), auc=c(0), accuracy=c(0), balanced_accuracy=c(0)
                               , sensitivity=c(0), specificity=c(0), f1_score=c(0))
 model_compare_df
 model_num = 0
@@ -82,9 +82,9 @@ model_num = 0
 model_description = "Simple Log"
 
 #Var Selection based on our EDA and Lasso
-variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
-                      "raterisk", "fracscore", "bonemed", "bonemed_fu", 
-                      "bonetreat", "height", "fracture")
+variablesToSelect = c("priorfrac", "age", "height", "bmi", "premeno", "momfrac", 
+                      "armassist", "smoke", "raterisk", "bonemed", "bonemed_fu", 
+                      "bonetreat", "fracture")
 train = raw_train %>% select(variablesToSelect)
 test = raw_test %>% select(variablesToSelect)
 
@@ -107,6 +107,7 @@ best_threshold = get_and_plot_best_threshold(preds, test$fracture)
 class_preds = ifelse(preds > best_threshold,"Yes","No")
 CM_rep = confusionMatrix(table(class_preds, test$fracture))
 CM_rep
+acc = CM_rep$overall[1]
 balanced_acc = CM_rep$byClass[11]
 sens = CM_rep$byClass[1]
 spec = CM_rep$byClass[2]
@@ -115,59 +116,11 @@ recall = CM_rep$byClass[6]
 f1 = get_f1(precision, recall)
 
 #Update Model Comparison Dataframe
-model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
+model_stats = c(model_num, model_description, auc, acc, balanced_acc, sens, spec, f1)
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
-#Model 2: Remove values that were not significant
-model_description = "Simple Log + Significant Features"
 
-#Var Selection
-variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
-                      "raterisk", "fracscore", "bonemed", "bonemed_fu", 
-                      "bonetreat", "height", "fracture")
-train = raw_train %>% select(variablesToSelect)
-test = raw_test %>% select(variablesToSelect)
-
-#Standardize Data
-cts_vars = c("age", "height")
-train = get_standardized_df(train, cts_vars)
-test = get_standardized_df(test, cts_vars)
-
-#Model
-model_num = model_num + 1
-model=glm(fracture~
-             priorfrac+
-             age+
-             momfrac+
-             armassist+
-             raterisk+
-             bonemed+
-             bonetreat+
-             height,
-           family="binomial",data=train)
-summary(model)
-
-#Roc and AUC
-auc = plot_roc_and_get_auc(model, test, "fracture")
-
-#Best Threshold using Balanced Acc
-preds = unname(predict(model, test, type="response"))
-best_threshold = get_and_plot_best_threshold(preds, test$fracture)
-class_preds = ifelse(preds > best_threshold,"Yes","No")
-CM_rep = confusionMatrix(table(class_preds, test$fracture))
-CM_rep
-balanced_acc = CM_rep$byClass[11]
-sens = CM_rep$byClass[1]
-spec = CM_rep$byClass[2]
-precision = CM_rep$byClass[5]
-recall = CM_rep$byClass[6]
-f1 = get_f1(precision, recall)
-
-#Update Model Comparison Dataframe
-model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
-model_compare_df = rbind(model_compare_df, model_stats)
-model_compare_df
 
 #Model 3: Cts Interaction using stepwise approach
 model_description = "Complex Log + Interactions"
@@ -206,6 +159,7 @@ best_threshold = get_and_plot_best_threshold(preds, test$fracture)
 class_preds = ifelse(preds > best_threshold,"Yes","No")
 CM_rep = confusionMatrix(table(class_preds, test$fracture))
 CM_rep
+acc = CM_rep$overall[1]
 balanced_acc = CM_rep$byClass[11]
 sens = CM_rep$byClass[1]
 spec = CM_rep$byClass[2]
@@ -214,7 +168,7 @@ recall = CM_rep$byClass[6]
 f1 = get_f1(precision, recall)
 
 #Update Model Comparison Dataframe
-model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
+model_stats = c(model_num, model_description, auc, acc, balanced_acc, sens, spec, f1)
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
@@ -268,6 +222,7 @@ best_threshold = get_and_plot_best_threshold(preds, test$fracture)
 class_preds = ifelse(preds > best_threshold,"Yes","No")
 CM_rep = confusionMatrix(table(class_preds, test$fracture))
 CM_rep
+acc = CM_rep$overall[1]
 balanced_acc = CM_rep$byClass[11]
 sens = CM_rep$byClass[1]
 spec = CM_rep$byClass[2]
@@ -276,7 +231,7 @@ recall = CM_rep$byClass[6]
 f1 = get_f1(precision, recall)
 
 #Update Model Comparison Dataframe
-model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
+model_stats = c(model_num, model_description, auc, acc, balanced_acc, sens, spec, f1)
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
@@ -301,12 +256,14 @@ model=qda(fracture~
   
 
 #Roc and AUC: Custom Func Needed
-auc = -1
+class_preds=predict(model,newdata=test)$class
+auc = plot_roc_and_get_auc_generalized(preds, test, "fracture")
 
 #Best Threshold using Balanced Accuracy
 class_preds=predict(model,newdata=test)$class
 CM_rep = confusionMatrix(table(class_preds, test$fracture))
 CM_rep
+acc = CM_rep$overall[1]
 balanced_acc = CM_rep$byClass[11]
 sens = CM_rep$byClass[1]
 spec = CM_rep$byClass[2]
@@ -315,7 +272,7 @@ recall = CM_rep$byClass[6]
 f1 = get_f1(precision, recall)
 
 #Update Model Comparison Dataframe
-model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
+model_stats = c(model_num, model_description, auc, acc, balanced_acc, sens, spec, f1)
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
@@ -358,6 +315,7 @@ auc = -1
 pred_forest = predict(model, test_fea)
 CM_rep = confusionMatrix(table(pred_forest, test$fracture))
 CM_rep
+acc = CM_rep$overall[1]
 balanced_acc = CM_rep$byClass[11]
 sens = CM_rep$byClass[1]
 spec = CM_rep$byClass[2]
@@ -366,13 +324,13 @@ recall = CM_rep$byClass[6]
 f1 = get_f1(precision, recall)
 
 #Update Model Comparison Dataframe
-model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
+model_stats = c(model_num, model_description, auc, acc, balanced_acc, sens, spec, f1)
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
 #Remove Useless row
-model_compare_df = model_compare_df[-1,]
-model_compare_df
+final_model_compare_df = model_compare_df[-1,-1]
+final_model_compare_df
 
 
 

@@ -110,7 +110,6 @@ plot_roc_and_get_auc = function(model, test_data, target_feature){
 }
 
 plot_roc_and_get_auc_generalized = function(preds, test_data, target_feature){
-  preds = predict(model, test_data, type="response")
   preds_and_target = prediction(preds, test_data[,target_feature])
   roc = performance(preds_and_target, measure = "tpr", x.measure = "fpr")
   auc_perf = performance(preds_and_target, measure = "auc")
