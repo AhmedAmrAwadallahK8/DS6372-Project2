@@ -124,24 +124,40 @@ get_f1 = function(precision, recall){
 }
 
 
-get_and_plot_best_threshold = function(preds, target){
+get_and_plot_best_threshold = function(preds, target, pos_class, metric = "f1"){
   balanced_acc_holder = c()
+  f1_holder = c()
   threshold_holder = c()
   best_balanced_acc = 0
   best_threshold = 0
+  best_f1 = 0
   for(i in 1:100){
     threshold = i/100
     tryCatch(
       expr = {
         class_preds = ifelse(preds > threshold,"Yes","No")
-        CM_report = confusionMatrix(table(class_preds, target))
-        balanced_acc = unname(CM_report$byClass[11])
-        balanced_acc_holder = c(balanced_acc_holder, balanced_acc)
+        CM_report = confusionMatrix(table(class_preds, target), positive = pos_class)
         threshold_holder = c(threshold_holder, threshold)
-        if(balanced_acc > best_balanced_acc){
-          best_balanced_acc = balanced_acc
-          best_threshold = threshold
+        if(metric == "balanced_acc"){
+          balanced_acc = unname(CM_report$byClass[11])
+          balanced_acc_holder = c(balanced_acc_holder, balanced_acc)
+          if(balanced_acc > best_balanced_acc){
+            best_balanced_acc = balanced_acc
+            best_threshold = threshold
+          }
         }
+        if(metric == "f1"){
+          precision = CM_report$byClass[5]
+          recall = CM_report$byClass[6]
+          f1 = get_f1(precision, recall)
+          f1_holder = c(f1_holder, f1)
+          if(f1 > best_f1){
+            best_f1 = f1
+            best_threshold = threshold
+          }
+          
+        }
+        
       },
       error = function(e){ 
         # (Optional)
@@ -157,8 +173,14 @@ get_and_plot_best_threshold = function(preds, target){
       }
     )
   }
-  plot(threshold_holder, balanced_acc_holder, xlab="Threshold", ylab="Balanced Accuracy", type="l")
-  abline(v=best_threshold, col="red")
+  if(metric == "balanced_acc"){
+    plot(threshold_holder, balanced_acc_holder, xlab="Threshold", ylab="Balanced Accuracy", type="l")
+    abline(v=best_threshold, col="red")
+  }
+  if(metric == "f1"){
+    plot(threshold_holder, f1_holder, xlab="Threshold", ylab="Balanced Accuracy", type="l")
+    abline(v=best_threshold, col="red")
+  }
   return(best_threshold)
 }
 

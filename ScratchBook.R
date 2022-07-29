@@ -1,4 +1,18 @@
 #Random Code
+
+#Prev model 3
+model=glm(fracture~
+            priorfrac+
+            age  +
+            height + height:bonemed_fu  +
+            momfrac+
+            armassist+
+            raterisk+
+            bonemed+
+            bonemed_fu +
+            bonetreat
+          ,family="binomial",data=train)
+
 #Previous model 3
 variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
                       "raterisk", "fracscore", "bonemed", "bonemed_fu", 
@@ -138,3 +152,41 @@ roc = performance(simple_log_preds, measure = "tpr", x.measure = "fpr")
 #auc <- performance(pr, measure = "auc")
 #auc <- auc@y.values[[1]]
 #auc
+
+get_and_plot_best_threshold = function(preds, target, pos_class){
+  balanced_acc_holder = c()
+  threshold_holder = c()
+  best_balanced_acc = 0
+  best_threshold = 0
+  for(i in 1:100){
+    threshold = i/100
+    tryCatch(
+      expr = {
+        class_preds = ifelse(preds > threshold,"Yes","No")
+        CM_report = confusionMatrix(table(class_preds, target), positive = pos_class)
+        balanced_acc = unname(CM_report$byClass[11])
+        balanced_acc_holder = c(balanced_acc_holder, balanced_acc)
+        threshold_holder = c(threshold_holder, threshold)
+        if(balanced_acc > best_balanced_acc){
+          best_balanced_acc = balanced_acc
+          best_threshold = threshold
+        }
+      },
+      error = function(e){ 
+        # (Optional)
+        # Do this if an error is caught...
+      },
+      warning = function(w){
+        # (Optional)
+        # Do this if an warning is caught...
+      },
+      finally = {
+        # (Optional)
+        # Do this at the end before quitting the tryCatch structure...
+      }
+    )
+  }
+  plot(threshold_holder, balanced_acc_holder, xlab="Threshold", ylab="Balanced Accuracy", type="l")
+  abline(v=best_threshold, col="red")
+  return(best_threshold)
+}

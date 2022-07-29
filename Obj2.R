@@ -6,6 +6,8 @@ library(randomForest)
 library(MASS)
 library(mvtnorm)
 
+#Redo Model 2 and Model 3
+
 
 #Change working directory to this source file directory
 setwd(dirname(rstudioapi::getSourceEditorContext()$path))
@@ -38,8 +40,8 @@ raw_train %>% ggplot(aes(x=fracture)) + geom_bar()
 
 #Lasso Prefers Standardized Data
 cts_vars = c("phy_id", "age", "weight", "height", "bmi", "fracscore")
-train = get_standardized_df(train, cts_vars)
-test = get_standardized_df(test, cts_vars)
+train = get_standardized_df(raw_train, cts_vars)
+test = get_standardized_df(raw_test, cts_vars)
 
 #Lasso Protocol
 TrainFeatures = train
@@ -70,7 +72,7 @@ auc = auc_holder@y.values[[1]]
 auc
 
 
-#Weight was dropped by Lasso
+#Weight and Fracscore was dropped by Lasso
 
 #Start Model Building Process
 model_compare_df = data.frame(model_num = c(0), model_description = c("Null Model"), auc=c(0), accuracy=c(0), balanced_accuracy=c(0)
@@ -78,7 +80,9 @@ model_compare_df = data.frame(model_num = c(0), model_description = c("Null Mode
 model_compare_df
 model_num = 0
 
-#Model 1: Simple
+pos_class = "Yes"
+
+#Model 1: Simple Log From Obj 1
 model_description = "Simple Log"
 
 #Var Selection based on our EDA and Lasso
@@ -103,10 +107,10 @@ auc = plot_roc_and_get_auc(model, test, "fracture")
 
 #Best Threshold using Balanced Acc
 preds = unname(predict(model, test, type="response"))
-best_threshold = get_and_plot_best_threshold(preds, test$fracture)
+best_threshold = get_and_plot_best_threshold(preds, test$fracture, pos_class)
 best_threshold
 class_preds = ifelse(preds > best_threshold,"Yes","No")
-CM_rep = confusionMatrix(table(class_preds, test$fracture))
+CM_rep = confusionMatrix(table(class_preds, test$fracture), positive = pos_class)
 CM_rep
 acc = CM_rep$overall[1]
 balanced_acc = CM_rep$byClass[11]
@@ -123,10 +127,10 @@ model_compare_df
 
 
 
-#Model 3: Cts Interaction using stepwise approach
+#Model 2: Cts Interaction using stepwise approach
 model_description = "Complex Log + Interactions"
 #Var Selection
-variablesToSelect = c("priorfrac", "age", "height", "momfrac", 
+variablesToSelect = c("phy_id", "priorfrac", "age", "height", "bmi", "premeno", "momfrac", 
                       "armassist", "raterisk", "bonemed", "bonemed_fu", 
                       "bonetreat", "fracture")
 train = raw_train %>% select(variablesToSelect)
@@ -140,9 +144,12 @@ test = get_standardized_df(test, cts_vars)
 #Model
 model_num = model_num + 1
 model=glm(fracture~
+             phy_id +
              priorfrac+
-             age + tan(age) + age:priorfrac + age:raterisk + age:bonemed + age:bonetreat +
-             height +
+             age  +
+             height + height:bonemed_fu  +
+             bmi +
+             premeno +
              momfrac+
              armassist+
              raterisk+
@@ -157,9 +164,9 @@ auc = plot_roc_and_get_auc(model, test, "fracture")
 
 #Best Threshold using Balanced Accuracy
 preds = unname(predict(model, test, type="response"))
-best_threshold = get_and_plot_best_threshold(preds, test$fracture)
+best_threshold = get_and_plot_best_threshold(preds, test$fracture, pos_class)
 class_preds = ifelse(preds > best_threshold,"Yes","No")
-CM_rep = confusionMatrix(table(class_preds, test$fracture))
+CM_rep = confusionMatrix(table(class_preds, test$fracture), positive = pos_class)
 CM_rep
 acc = CM_rep$overall[1]
 balanced_acc = CM_rep$byClass[11]
@@ -174,12 +181,12 @@ model_stats = c(model_num, model_description, auc, acc, balanced_acc, sens, spec
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
-#Model 4: Non Standardized Data (If We have time)
+#Model 3: Non Standardized Data (If We have time)
 model_description = "Complex Log + Interactions + Transformed Features"
 #Var Selection
-variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
-                      "raterisk", "fracscore", "bonemed", "bonemed_fu", 
-                      "bonetreat", "height", "fracture")
+variablesToSelect = c("priorfrac", "age", "height", "momfrac", 
+                      "armassist", "raterisk", "bonemed", "bonemed_fu", 
+                      "bonetreat", "fracture")
 train = raw_train %>% select(variablesToSelect)
 test = raw_test %>% select(variablesToSelect)
 
@@ -205,13 +212,14 @@ test = get_standardized_df(test, cts_vars)
 model_num = model_num + 1
 model=glm(fracture~
             priorfrac+
-            age + tan(age) + age:priorfrac + age:raterisk + age:bonemed + age:bonetreat +
+            age  + harmonic_age +
+            height + height:bonemed_fu +
             momfrac+
             armassist+
             raterisk+
             bonemed+
-            bonetreat+
-            height + harmonic_height
+            bonemed_fu +
+            bonetreat
           ,family="binomial",data=train)
 summary(model)
 
@@ -220,9 +228,9 @@ auc = plot_roc_and_get_auc(model, test, "fracture")
 
 #Best Threshold using Balanced Accuracy
 preds = unname(predict(model, test, type="response"))
-best_threshold = get_and_plot_best_threshold(preds, test$fracture)
+best_threshold = get_and_plot_best_threshold(preds, test$fracture, pos_class)
 class_preds = ifelse(preds > best_threshold,"Yes","No")
-CM_rep = confusionMatrix(table(class_preds, test$fracture))
+CM_rep = confusionMatrix(table(class_preds, test$fracture), positive = pos_class)
 CM_rep
 acc = CM_rep$overall[1]
 balanced_acc = CM_rep$byClass[11]
@@ -237,7 +245,7 @@ model_stats = c(model_num, model_description, auc, acc, balanced_acc, sens, spec
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
-#Model 5: QDA
+#Model 4: QDA
 model_description = "QDA"
 model_num = model_num + 1
 
@@ -264,7 +272,7 @@ auc = plot_roc_and_get_auc_generalized(numeric_preds, test, "fracture")
 
 #Best Threshold using Balanced Accuracy
 class_preds=predict(model,newdata=test)$class
-CM_rep = confusionMatrix(table(class_preds, test$fracture))
+CM_rep = confusionMatrix(table(class_preds, test$fracture), positive = pos_class)
 CM_rep
 acc = CM_rep$overall[1]
 balanced_acc = CM_rep$byClass[11]
@@ -279,7 +287,7 @@ model_stats = c(model_num, model_description, auc, acc, balanced_acc, sens, spec
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
-#Model 6: Nonparametric (Random Forest)
+#Model 5: Nonparametric (Random Forest)
 model_description = "Random Forest"
 model_num = model_num + 1
 
@@ -318,7 +326,7 @@ auc = plot_roc_and_get_auc_generalized(numeric_preds, test, "fracture")
 
 #Best Threshold using Balanced Accuracy
 pred_forest = predict(model, test_fea)
-CM_rep = confusionMatrix(table(pred_forest, test$fracture))
+CM_rep = confusionMatrix(table(pred_forest, test$fracture), positive = pos_class)
 CM_rep
 acc = CM_rep$overall[1]
 balanced_acc = CM_rep$byClass[11]
