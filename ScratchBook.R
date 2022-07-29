@@ -1,4 +1,20 @@
 #Random Code
+#Previous model 3
+variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
+                      "raterisk", "fracscore", "bonemed", "bonemed_fu", 
+                      "bonetreat", "height", "fracture")
+
+model=glm(fracture~
+            priorfrac+
+            age + tan(age) + age:priorfrac + age:raterisk + age:bonemed + age:bonetreat +
+            momfrac+
+            armassist+
+            raterisk+
+            bonemed+
+            bonetreat+
+            height
+          ,family="binomial",data=train)
+
 #Model 2: Remove values that were not significant
 model_description = "Simple Log + Significant Features"
 

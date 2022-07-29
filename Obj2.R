@@ -82,8 +82,8 @@ model_num = 0
 model_description = "Simple Log"
 
 #Var Selection based on our EDA and Lasso
-variablesToSelect = c("priorfrac", "age", "height", "bmi", "premeno", "momfrac", 
-                      "armassist", "smoke", "raterisk", "bonemed", "bonemed_fu", 
+variablesToSelect = c("priorfrac", "age", "height", "momfrac", 
+                      "armassist", "raterisk", "bonemed", "bonemed_fu", 
                       "bonetreat", "fracture")
 train = raw_train %>% select(variablesToSelect)
 test = raw_test %>% select(variablesToSelect)
@@ -104,6 +104,7 @@ auc = plot_roc_and_get_auc(model, test, "fracture")
 #Best Threshold using Balanced Acc
 preds = unname(predict(model, test, type="response"))
 best_threshold = get_and_plot_best_threshold(preds, test$fracture)
+best_threshold
 class_preds = ifelse(preds > best_threshold,"Yes","No")
 CM_rep = confusionMatrix(table(class_preds, test$fracture))
 CM_rep
@@ -125,9 +126,9 @@ model_compare_df
 #Model 3: Cts Interaction using stepwise approach
 model_description = "Complex Log + Interactions"
 #Var Selection
-variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
-                      "raterisk", "fracscore", "bonemed", "bonemed_fu", 
-                      "bonetreat", "height", "fracture")
+variablesToSelect = c("priorfrac", "age", "height", "momfrac", 
+                      "armassist", "raterisk", "bonemed", "bonemed_fu", 
+                      "bonetreat", "fracture")
 train = raw_train %>% select(variablesToSelect)
 test = raw_test %>% select(variablesToSelect)
 
@@ -141,12 +142,13 @@ model_num = model_num + 1
 model=glm(fracture~
              priorfrac+
              age + tan(age) + age:priorfrac + age:raterisk + age:bonemed + age:bonetreat +
+             height +
              momfrac+
              armassist+
              raterisk+
              bonemed+
-             bonetreat+
-             height
+             bonemed_fu +
+             bonetreat
           ,family="binomial",data=train)
 summary(model)
 
@@ -255,9 +257,10 @@ model=qda(fracture~
           ,family="binomial",data=train)
   
 
-#Roc and AUC: Custom Func Needed
+#Roc and AUC:
 class_preds=predict(model,newdata=test)$class
-auc = plot_roc_and_get_auc_generalized(preds, test, "fracture")
+numeric_preds = ifelse(class_preds == "Yes",1,0)
+auc = plot_roc_and_get_auc_generalized(numeric_preds, test, "fracture")
 
 #Best Threshold using Balanced Accuracy
 class_preds=predict(model,newdata=test)$class
@@ -309,7 +312,9 @@ model = randomForest(x=train_fea, y=train_tar$fracture,
                       ntree = 1000, maxnodes = optimal_d)
 
 #Roc and AUC: Have to make custom func for this
-auc = -1
+class_preds = unname(predict(model, test_fea))
+numeric_preds = ifelse(class_preds == "Yes",1,0)
+auc = plot_roc_and_get_auc_generalized(numeric_preds, test, "fracture")
 
 #Best Threshold using Balanced Accuracy
 pred_forest = predict(model, test_fea)
