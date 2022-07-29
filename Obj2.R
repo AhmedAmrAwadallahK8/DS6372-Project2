@@ -73,12 +73,13 @@ auc
 #Weight was dropped by Lasso
 
 #Start Model Building Process
-model_compare_df = data.frame(model_num = c(0), auc=c(0), balanced_accuracy=c(0)
+model_compare_df = data.frame(model_num = c(0), model_description = c("Null Model"), auc=c(0), balanced_accuracy=c(0)
                               , sensitivity=c(0), specificity=c(0), f1_score=c(0))
 model_compare_df
 model_num = 0
 
 #Model 1: Simple
+model_description = "Simple Log"
 
 #Var Selection based on our EDA and Lasso
 variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
@@ -114,11 +115,13 @@ recall = CM_rep$byClass[6]
 f1 = get_f1(precision, recall)
 
 #Update Model Comparison Dataframe
-model_stats = c(model_num, auc, balanced_acc, sens, spec, f1)
+model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
 #Model 2: Remove values that were not significant
+model_description = "Simple Log + Significant Features"
+
 #Var Selection
 variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
                       "raterisk", "fracscore", "bonemed", "bonemed_fu", 
@@ -162,11 +165,12 @@ recall = CM_rep$byClass[6]
 f1 = get_f1(precision, recall)
 
 #Update Model Comparison Dataframe
-model_stats = c(model_num, auc, balanced_acc, sens, spec, f1)
+model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
 #Model 3: Cts Interaction using stepwise approach
+model_description = "Complex Log + Interactions"
 #Var Selection
 variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
                       "raterisk", "fracscore", "bonemed", "bonemed_fu", 
@@ -210,13 +214,74 @@ recall = CM_rep$byClass[6]
 f1 = get_f1(precision, recall)
 
 #Update Model Comparison Dataframe
-model_stats = c(model_num, auc, balanced_acc, sens, spec, f1)
+model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
 #Model 4: Non Standardized Data (If We have time)
+model_description = "Complex Log + Interactions + Transformed Features"
+#Var Selection
+variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", 
+                      "raterisk", "fracscore", "bonemed", "bonemed_fu", 
+                      "bonetreat", "height", "fracture")
+train = raw_train %>% select(variablesToSelect)
+test = raw_test %>% select(variablesToSelect)
+
+#Add New Cts Features
+train$harmonic_age = 1/train$age
+train$log_age =log(train$age)
+
+train$harmonic_height = 1/train$height
+train$log_height =log(train$height)
+
+test$harmonic_age = 1/test$age
+test$log_age =log(test$age)
+
+test$harmonic_height = 1/test$height
+test$log_height =log(test$height)
+
+#Standardize Data
+cts_vars = c("age", "harmonic_age", "log_age", "height", "harmonic_height", "log_height")
+train = get_standardized_df(train, cts_vars)
+test = get_standardized_df(test, cts_vars)
+
+#Model
+model_num = model_num + 1
+model=glm(fracture~
+            priorfrac+
+            age + tan(age) + age:priorfrac + age:raterisk + age:bonemed + age:bonetreat +
+            momfrac+
+            armassist+
+            raterisk+
+            bonemed+
+            bonetreat+
+            height + harmonic_height
+          ,family="binomial",data=train)
+summary(model)
+
+#Roc and AUC
+auc = plot_roc_and_get_auc(model, test, "fracture")
+
+#Best Threshold using Balanced Accuracy
+preds = unname(predict(model, test, type="response"))
+best_threshold = get_and_plot_best_threshold(preds, test$fracture)
+class_preds = ifelse(preds > best_threshold,"Yes","No")
+CM_rep = confusionMatrix(table(class_preds, test$fracture))
+CM_rep
+balanced_acc = CM_rep$byClass[11]
+sens = CM_rep$byClass[1]
+spec = CM_rep$byClass[2]
+precision = CM_rep$byClass[5]
+recall = CM_rep$byClass[6]
+f1 = get_f1(precision, recall)
+
+#Update Model Comparison Dataframe
+model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
+model_compare_df = rbind(model_compare_df, model_stats)
+model_compare_df
 
 #Model 5: QDA
+model_description = "QDA"
 model_num = model_num + 1
 
 #Var Selection
@@ -250,11 +315,12 @@ recall = CM_rep$byClass[6]
 f1 = get_f1(precision, recall)
 
 #Update Model Comparison Dataframe
-model_stats = c(model_num, auc, balanced_acc, sens, spec, f1)
+model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
 #Model 6: Nonparametric (Random Forest)
+model_description = "Random Forest"
 model_num = model_num + 1
 
 #Var Selection
@@ -300,8 +366,12 @@ recall = CM_rep$byClass[6]
 f1 = get_f1(precision, recall)
 
 #Update Model Comparison Dataframe
-model_stats = c(model_num, auc, balanced_acc, sens, spec, f1)
+model_stats = c(model_num, model_description, auc, balanced_acc, sens, spec, f1)
 model_compare_df = rbind(model_compare_df, model_stats)
+model_compare_df
+
+#Remove Useless row
+model_compare_df = model_compare_df[-1,]
 model_compare_df
 
 

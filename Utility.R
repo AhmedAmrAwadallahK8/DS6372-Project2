@@ -109,6 +109,17 @@ plot_roc_and_get_auc = function(model, test_data, target_feature){
   return(auc)
 }
 
+plot_roc_and_get_auc_generalized = function(preds, test_data, target_feature){
+  preds = predict(model, test_data, type="response")
+  preds_and_target = prediction(preds, test_data[,target_feature])
+  roc = performance(preds_and_target, measure = "tpr", x.measure = "fpr")
+  auc_perf = performance(preds_and_target, measure = "auc")
+  auc = auc_perf@y.values[[1]]
+  plot(roc, colorize=TRUE)
+  abline(a=0, b= 1)
+  return(auc)
+}
+
 get_f1 = function(precision, recall){
   return(2*((precision*recall)/(precision + recall)))
 }
