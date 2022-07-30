@@ -6,6 +6,8 @@ library(randomForest)
 library(MASS)
 library(mvtnorm)
 
+#What is the impact of outliers on PCA
+
 #Redo Model 2 and Model 3
 
 
@@ -128,7 +130,7 @@ model_compare_df
 
 
 #Model 2: Cts Interaction using stepwise approach
-model_description = "Complex Log + Interactions"
+model_description = "LogReg + Interactions"
 #Var Selection
 variablesToSelect = c("phy_id", "priorfrac", "age", "height", "bmi", "premeno", "momfrac", 
                       "armassist", "raterisk", "bonemed", "bonemed_fu", 
@@ -144,12 +146,9 @@ test = get_standardized_df(test, cts_vars)
 #Model
 model_num = model_num + 1
 model=glm(fracture~
-             phy_id +
-             priorfrac+
-             age  +
-             height + height:bonemed_fu  +
-             bmi +
-             premeno +
+             age + 
+             height +
+             bmi  + bmi:bonemed +
              momfrac+
              armassist+
              raterisk+
@@ -182,9 +181,9 @@ model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
 #Model 3: Non Standardized Data (If We have time)
-model_description = "Complex Log + Interactions + Transformed Features"
+model_description = "LogReg + Interactions + Transformed Features"
 #Var Selection
-variablesToSelect = c("priorfrac", "age", "height", "momfrac", 
+variablesToSelect = c("phy_id", "priorfrac", "age", "height", "bmi", "premeno", "momfrac", 
                       "armassist", "raterisk", "bonemed", "bonemed_fu", 
                       "bonetreat", "fracture")
 train = raw_train %>% select(variablesToSelect)
@@ -197,23 +196,29 @@ train$log_age =log(train$age)
 train$harmonic_height = 1/train$height
 train$log_height =log(train$height)
 
+train$harmonic_bmi = 1/train$bmi
+train$log_bmi =log(train$bmi)
+
 test$harmonic_age = 1/test$age
 test$log_age =log(test$age)
 
 test$harmonic_height = 1/test$height
 test$log_height =log(test$height)
 
+test$harmonic_bmi = 1/test$bmi
+test$log_bmi =log(test$bmi)
+
 #Standardize Data
-cts_vars = c("age", "harmonic_age", "log_age", "height", "harmonic_height", "log_height")
+cts_vars = c("age", "harmonic_age", "log_age", "height", "harmonic_height", "log_height", "bmi", "harmonic_bmi", "log_bmi")
 train = get_standardized_df(train, cts_vars)
 test = get_standardized_df(test, cts_vars)
 
 #Model
 model_num = model_num + 1
 model=glm(fracture~
-            priorfrac+
-            age  + harmonic_age +
-            height + height:bonemed_fu +
+            age +
+            height + tan(harmonic_height) + tan(harmonic_height):bmi +
+            bmi  + bmi:bonemed +
             momfrac+
             armassist+
             raterisk+
@@ -259,9 +264,7 @@ cts_vars = c("phy_id", "age", "height", "bmi", "fracscore")
 train = get_standardized_df(train, cts_vars)
 test = get_standardized_df(test, cts_vars)
 
-model=qda(fracture~
-            age+
-            height
+model=qda(fracture~.
           ,family="binomial",data=train)
   
 

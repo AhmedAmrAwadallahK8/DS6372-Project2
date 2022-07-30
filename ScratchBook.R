@@ -1,5 +1,21 @@
 #Random Code
 
+#prev model2
+model=glm(fracture~
+            phy_id + phy_id:raterisk +
+            priorfrac+
+            age   + age:armassist +
+            height +
+            bmi +
+            premeno +
+            momfrac+
+            armassist+
+            raterisk+
+            bonemed+
+            bonemed_fu +
+            bonetreat
+          ,family="binomial",data=train)
+
 #Prev model 3
 model=glm(fracture~
             priorfrac+

@@ -178,7 +178,7 @@ get_and_plot_best_threshold = function(preds, target, pos_class, metric = "f1"){
     abline(v=best_threshold, col="red")
   }
   if(metric == "f1"){
-    plot(threshold_holder, f1_holder, xlab="Threshold", ylab="Balanced Accuracy", type="l")
+    plot(threshold_holder, f1_holder, xlab="Threshold", ylab="F1 Score", type="l")
     abline(v=best_threshold, col="red")
   }
   return(best_threshold)
