@@ -8,7 +8,7 @@ library(mvtnorm)
 
 #What is the impact of outliers on PCA
 
-#Redo Model 2 and Model 3
+#Complex QDA?
 
 
 #Change working directory to this source file directory
@@ -181,7 +181,7 @@ model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
 #Model 3: Non Standardized Data (If We have time)
-model_description = "LogReg + Interactions + Transformed Features"
+model_description = "Complex LogReg"
 #Var Selection
 variablesToSelect = c("phy_id", "priorfrac", "age", "height", "bmi", "premeno", "momfrac", 
                       "armassist", "raterisk", "bonemed", "bonemed_fu", 
@@ -250,23 +250,41 @@ model_stats = c(model_num, model_description, auc, acc, balanced_acc, sens, spec
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
-#Model 4: QDA
-model_description = "QDA"
-model_num = model_num + 1
+#Model 4: QDA with base features
+model_description = "QDA + Normal Space"
+
 
 #Var Selection
 variablesToSelect = c("phy_id", "age", "height", "bmi", "fracscore", "fracture")
 train = raw_train %>% select(variablesToSelect)
 test = raw_test %>% select(variablesToSelect)
+str(train)
+#Add New Cts Features
+train$harmonic_height = 1/train$height
+train$log_height =log(train$height)
+
+train$harmonic_bmi = 1/train$bmi
+train$log_bmi =log(train$bmi)
+
+test$harmonic_height = 1/test$height
+test$log_height =log(test$height)
+
+test$harmonic_bmi = 1/test$bmi
+test$log_bmi =log(test$bmi)
+
 
 #Standardize Data
-cts_vars = c("phy_id", "age", "height", "bmi", "fracscore")
+cts_vars = c("height", "harmonic_height", "log_height", "bmi", "harmonic_bmi", "log_bmi")
 train = get_standardized_df(train, cts_vars)
 test = get_standardized_df(test, cts_vars)
 
-model=qda(fracture~.
-          ,family="binomial",data=train)
-  
+#Model
+model_num = model_num + 1
+model=qda(fracture~
+          height  + cos(height) +
+          bmi + bmi:fracscore + sin(log_bmi) +
+          fracscore,
+          family="binomial",data=train)
 
 #Roc and AUC:
 class_preds=predict(model,newdata=test)$class
@@ -290,7 +308,62 @@ model_stats = c(model_num, model_description, auc, acc, balanced_acc, sens, spec
 model_compare_df = rbind(model_compare_df, model_stats)
 model_compare_df
 
-#Model 5: Nonparametric (Random Forest)
+#Model 5: QDA in PC Space
+model_description = "QDA + PC Space"
+
+
+#Var Selection
+variablesToSelect = c("phy_id", "age", "height", "bmi", "fracscore", "fracture")
+norm_train = raw_train %>% select(variablesToSelect)
+norm_test = raw_test %>% select(variablesToSelect)
+
+#Standardize Data
+cts_vars = c("phy_id", "age", "height", "bmi", "fracscore")
+norm_train = get_standardized_df(norm_train, cts_vars)
+norm_test = get_standardized_df(norm_test, cts_vars)
+
+#Setup PC Train Test Dataframes
+predictors = c("phy_id", "age", "height", "bmi", "fracscore")
+pc_object = prcomp(norm_train[,predictors])
+train = data.frame(pc$x)
+test = data.frame(predict(pc_object, norm_test[,predictors]))
+fracture = norm_train$fracture
+train = cbind(train, fracture)
+fracture = norm_test$fracture
+test = cbind(test, fracture)
+print(pc_object)
+#Model
+model_num = model_num + 1
+model=qda(fracture~
+            PC1+ PC1:PC2 +
+            PC2+
+            PC3+
+            PC4,
+          family="binomial",data=train)
+
+#Roc and AUC:
+class_preds=predict(model,newdata=test)$class
+numeric_preds = ifelse(class_preds == "Yes",1,0)
+auc = plot_roc_and_get_auc_generalized(numeric_preds, test, "fracture")
+
+#Best Threshold using Balanced Accuracy
+class_preds=predict(model,newdata=test)$class
+CM_rep = confusionMatrix(table(class_preds, test$fracture), positive = pos_class)
+CM_rep
+acc = CM_rep$overall[1]
+balanced_acc = CM_rep$byClass[11]
+sens = CM_rep$byClass[1]
+spec = CM_rep$byClass[2]
+precision = CM_rep$byClass[5]
+recall = CM_rep$byClass[6]
+f1 = get_f1(precision, recall)
+
+#Update Model Comparison Dataframe
+model_stats = c(model_num, model_description, auc, acc, balanced_acc, sens, spec, f1)
+model_compare_df = rbind(model_compare_df, model_stats)
+model_compare_df
+
+#Model 6: Nonparametric (Random Forest)
 model_description = "Random Forest"
 model_num = model_num + 1
 
