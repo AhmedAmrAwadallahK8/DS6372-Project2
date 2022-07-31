@@ -1,0 +1,340 @@
+---
+title: "Project2Stats2"
+author: "Luke"
+date: "7/17/2022"
+output: html_document
+---
+
+EDA
+Get data, view head, and summary. 
+```{r}
+library(aplore3)
+head(glow_bonemed, n=50)
+
+#we will be testing for fracture
+summary(glow_bonemed)
+
+```
+
+EDA continued
+Checking assumptions, no multicolinearity, decently large sample size
+
+compare all with gg plot pairs.
+
+#1 sub_id 2 site_id 3 phy_id 4 priorfrac 5 age 6 weight 7 height 8 bmi 9 premeno 10 momfrac 11 armassist 12 smoke 13 raterisk 14 fracscore 15 fracture 16 bonemed 17 bonemed_fu 18 bonetreat
+
+sub_id will be removed because it is just the row number. Has nothing to do with fracture.
+
+You can see there is minor co linearity between some of the independent variables. 
+Phy_id and site_id - physician code and site id clearly go together, 
+weight and bmi, 
+bonemed and momfrac could totally be colinear. Maybe bonemed and momfrac, 
+armassist,smoke,raterisk possibly colinear with weight,height,bmi,premeno,  
+age and fracscore
+
+
+```{r}
+library(GGally)
+library(aplore3)
+#2-9
+#ggpairs(glow_bonemed,columns=2:9,aes(colour=fracture))
+#9-18
+#ggpairs(glow_bonemed,columns=9:18,aes(colour=fracture))
+
+
+#This is so we can compare all columns to one another in a plot that we can read.
+
+#2-5 compared to 6-10
+ggpairs(glow_bonemed,columns = c("site_id", "phy_id", "priorfrac", "age", "weight", "height", "bmi", "premeno", "momfrac"),
+columnLabels = c("site_id", "phy_id", "priorfrac", "age", "weight", "height", "bmi", "premeno", "momfrac"),aes(colour=fracture))
+
+#10-13 and 14, 16-18
+ggpairs(glow_bonemed,columns = c("momfrac", "armassist", "smoke", "raterisk", "fracscore", "bonemed", "bonemed_fu", "bonetreat"),
+columnLabels = c("momfrac", "armassist", "smoke", "raterisk", "fracscore", "bonemed", "bonemed_fu", "bonetreat"),aes(colour=fracture))
+
+#2-5 and 14, 16-18
+ggpairs(glow_bonemed,columns = c("site_id", "phy_id", "priorfrac", "age", "fracscore", "bonemed", "bonemed_fu", "bonetreat"),
+columnLabels = c("site_id", "phy_id", "priorfrac", "age", "fracscore", "bonemed", "bonemed_fu", "bonetreat"),aes(colour=fracture))
+
+#6-9, 10-13
+ggpairs(glow_bonemed,columns = c("weight", "height", "bmi", "premeno", "momfrac", "armassist", "smoke", "raterisk"),
+columnLabels = c("weight", "height", "bmi", "premeno", "momfrac", "armassist", "smoke", "raterisk"),aes(colour=fracture))
+
+#continuous variables and fracture
+ggpairs(glow_bonemed,columns = c("weight", "height", "bmi", "age", "fracscore", "fracture"),
+columnLabels = c("weight", "height", "bmi", "age", "fracscore", "fracture"),aes(colour=fracture))
+
+```
+
+Pick out some that are potentially colinear. 
+A little more EDA for specific interests
+
+Explore example predictors of interest vs fracture and example predictors vs predictors for deeper look into multi-collinearity.
+```{r}
+library(aplore3)
+
+### visualizing the relationship between specific predictors and fractures in the first year ###
+
+#no distict relationship between fracture and site_id
+#phy_id vs fracture
+plot(glow_bonemed$fracture~glow_bonemed$phy_id,col=c("red","blue"))
+
+#Looks like as raterisk goes up, so does fracture
+#raterisk (self-assigned) vs fracture proportion table and plot
+prop.table(table(glow_bonemed$fracture,glow_bonemed$raterisk),2)
+plot(glow_bonemed$fracture~glow_bonemed$raterisk,col=c("red","blue"))
+
+#Looks like as bonemed goes up, so does fracture
+#bonemed (at initial examination) vs fracture 
+plot(glow_bonemed$fracture~glow_bonemed$bonemed,col=c("red","blue"))
+
+
+### Checking for multicolinearity
+
+#find info about age so we can split it into categories for data exploration only
+summary(glow_bonemed$age)
+
+#create categorical age variable for data exploration only
+new_df <- glow_bonemed
+
+new_df$age_to_categorical <- cut(new_df$age,
+                       breaks=c(55, 70, 80, 95),
+                       labels=c('55-70', '70-80', '80-95'))
+
+
+
+#looks like there is a linear relationship between age and fracscore
+#age and fracscore
+plot(new_df$fracscore~new_df$age_to_categorical,col=c("red","blue"))
+
+#looks like there is a linear relationship between armassist and weight
+#armassist and weight
+plot(glow_bonemed$armassist~glow_bonemed$weight,col=c("red","blue"))
+
+#ggplot(glow_bonemed, aes(x=,y=, fill= fracture))
+```
+
+#1 sub_id 2 site_id 3 phy_id 4 priorfrac 5 age 6 weight 7 height 8 bmi 9 premeno 10 momfrac 11 armassist 12 smoke 13 raterisk 14 fracscore 15 fracture 16 bonemed 17 bonemed_fu 18 bonetreat
+
+You can see there is minor co linearity between some of the independent variables. Phy_id and site_id, weight and bmi, Maybe bonemed and momfrac, armassist,smoke,raterisk possibly colinear with weight,height,bmi,premeno,  age and fracscore
+
+First off sub_id should be removed because it is just the row number. Has nothing to do with fracture.
+correlations between suspects and vif scores and then create a simple model
+
+VIFs less than 10
+```{r}
+library(car)
+library(aplore3)
+library(dplyr)
+
+#variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", "raterisk", "fracscore", "bonemed", "bonemed_fu", "bonetreat", "height", "fracture")
+
+variablesToSelect = c("priorfrac", "age", "height", "bmi", "premeno", "momfrac", "armassist", "smoke", "raterisk", "bonemed", "bonemed_fu", "bonetreat", "fracture")
+
+glow_bonemed_subset <- glow_bonemed %>% dplyr::select(variablesToSelect)
+
+fit = glm(fracture~.,family="binomial",data=glow_bonemed_subset)
+summary(fit)
+
+#check VIF values
+vif(fit)[,3]^2
+
+```
+
+Create train and test split
+```{r}
+library(aplore3)
+set.seed(1234)
+
+get_upsampled_df = function(df, up_factor){
+  row_count = dim(df)[1]
+  up_row_count = row_count*up_factor - row_count
+  new_df = df[0,]
+  for(i in 1:up_row_count){
+    rand_row_ind = sample(1:row_count, 1)
+    new_row = df[rand_row_ind,]
+    new_df = rbind(new_df, new_row)
+  }
+  return(new_df)
+}
+
+get_df_with_upsampled_class = function(df, class_feature, class_value, up_factor){
+  class_value_indices = (df[,class_feature] == class_value)
+  specified_class_df = df[class_value_indices,]
+  upsampled_class_df = get_upsampled_df(specified_class_df, up_factor)
+  out_df = rbind(df, upsampled_class_df)
+  return(out_df)
+}
+
+splitPerc = .80
+
+trainIndicies = sample(1:dim(glow_bonemed_subset)[1], round(splitPerc * dim(glow_bonemed_subset)[1]))
+
+data.train =  glow_bonemed_subset[trainIndicies,]
+data.test  =  glow_bonemed_subset[-trainIndicies,]
+
+data.train = get_df_with_upsampled_class(data.train, "fracture", "Yes", 3) #CHANGE THIS TO YOUR CODE
+
+```
+
+stepwise model
+```{r}
+library(MASS)
+library(tidyverse)
+library(car)
+full.log<-glm(fracture~.,family="binomial",data=data.train)
+step.log<-full.log %>% stepAIC(trace=FALSE)
+```
+continued
+```{r}
+summary(step.log)
+exp(cbind("Odds ratio" = coef(step.log), confint.default(step.log, level = 0.95)))
+
+#after doing stepwise and running VIF, bonetreat had a VIF of 11.86 so we removed it.
+vif(step.log)
+#Note:  You can also look at vifs.  vif(step.log)  #Last column is interpreted based off of rule of 5 or 10
+```
+
+Lasso model
+```{r}
+#library(glmnet)
+#dat.train.x <- model.matrix(fracture~priorfrac+age+height+bmi+premeno+momfrac+armassist+smoke+raterisk+bonemed+bonemed_fu+bonetreat-1,data.train)
+#dat.train.y<-data.train[,13]
+#cvfit <- cv.glmnet(dat.train.x, dat.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
+#plot(cvfit)
+#coef(cvfit, s = "lambda.min")
+
+#CV misclassification error rate is 0.325
+#print("CV Error Rate:")
+#cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+#Optimal penalty 0.054
+#print("Penalty Value:")
+#cvfit$lambda.min
+
+#For final model predictions go ahead and refit lasso using entire
+#data set
+#finalmodel<-glmnet(dat.train.x, dat.train.y, family = "binomial",lambda=cvfit$lambda.min)
+#coef(finalmodel, s = "lambda.min")
+
+#final lasso model
+finalmodel <- glm(fracture~priorfrac+age+height+momfrac+armassist+raterisk+bonemed+bonemed_fu+bonetreat, family = "binomial", data=data.train)
+coef(finalmodel)
+
+#for cook's d plot
+plot(finalmodel)
+#for odds ratios
+exp(cbind("Odds ratio" = coef(finalmodel), confint.default(finalmodel, level = 0.95)))
+```
+
+compare the stepwise and lasso models using the test set.
+```{r}
+#library(glmnet)
+#create model using test set
+#dat.test.x<-model.matrix(fracture~priorfrac+age+height+bmi+premeno+momfrac+armassist+smoke+raterisk+bonemed+bonemed_fu+bonetreat-1,data.test)
+
+#predict lasso
+#fit.pred.lasso <- predict(finalmodel, newx = dat.test.x, type = "response")
+fit.pred.lasso <- predict(finalmodel, newdata = data.test, type="response")
+
+# showing that the predictions were pretty good
+data.test$fracture[1:15]
+fit.pred.lasso[1:15]
+
+#Making predictions for stepwise as well for later
+fit.pred.step<-predict(step.log,newdata=data.test,type="response")
+```
+
+To compute the confusion matrix on the test set for the two models, you simply take the predicted probabilites and convert them to the categorical names based on some cut off value for the probabilities.  
+
+Try changing the cutoff from the above code and see if that changes the accuracy between either test.
+```{r}
+
+cutoff<-0.55
+class.lasso<-factor(ifelse(fit.pred.lasso>cutoff,"Yes","No"),levels=c("No","Yes"))
+class.step<-factor(ifelse(fit.pred.step>cutoff,"Yes","No"),levels=c("No","Yes"))
+
+#Confusion Matrix for Lasso
+conf.lasso<-table(class.lasso,data.test$fracture)
+print("Confusion matrix for LASSO")
+conf.lasso
+
+#Confusion matrix for Stepwise 
+conf.step<-table(class.step,data.test$fracture)
+print("Confusion matrix for Stepwise")
+conf.step
+
+```
+
+We can compute the overall accuracy for the confusion matrix using the following code.  I've also included an additional code that allows for you to calculate overall accuracy without generating the table.
+```{r}
+library(caret)
+#Accuracy of LASSO and Stepwise
+print("Overall accuracy for LASSO and Stepwise respectively")
+sum(diag(conf.lasso))/sum(conf.lasso)
+sum(diag(conf.step))/sum(conf.step)
+
+
+print("Alternative calculations of accuracy")
+#Rather than making the calculations from the table, we can compute them more quickly using 
+#the following code which just checks if the prediction matches the truth and then computes the proportion.
+mean(class.lasso==(data.test$fracture))
+mean(class.step==(data.test$fracture))
+
+
+model_compare_df = data.frame(model_description = c("Null Model"), accuracy=c(0), balanced_accuracy=c(0)
+                              , sensitivity=c(0), specificity=c(0), f1_score=c(0))
+
+get_f1 = function(precision, recall){
+  return(2*((precision*recall)/(precision + recall)))
+}
+
+model_description = "Final Model Based on LASSO"
+CM_rep = confusionMatrix(table(class.lasso, data.test$fracture), positive = "Yes") #CHANGE THIS TO YOUR CONFUSION MATRIX
+CM_rep
+acc = CM_rep$overall[1]
+balanced_acc = CM_rep$byClass[11]
+sens = CM_rep$byClass[1]
+spec = CM_rep$byClass[2]
+precision = CM_rep$byClass[5]
+recall = CM_rep$byClass[6]
+f1 = get_f1(precision, recall)
+
+#Update Model Comparison Dataframe
+model_stats = c(model_description, acc, balanced_acc, sens, spec, f1)
+model_compare_df = rbind(model_compare_df, model_stats)
+model_compare_df
+
+model_description = "Stepwise"
+CM_rep = confusionMatrix(table(class.step, data.test$fracture), positive = "Yes") #CHANGE THIS TO YOUR CONFUSION MATRIX
+CM_rep
+acc = CM_rep$overall[1]
+balanced_acc = CM_rep$byClass[11]
+sens = CM_rep$byClass[1]
+spec = CM_rep$byClass[2]
+precision = CM_rep$byClass[5]
+recall = CM_rep$byClass[6]
+f1 = get_f1(precision, recall)
+
+#Update Model Comparison Dataframe
+model_stats = c(model_description, acc, balanced_acc, sens, spec, f1)
+model_compare_df = rbind(model_compare_df, model_stats)
+model_compare_df
+```
+
+Use ROC curves to find the optimal cut off
+```{r}
+#this is lasso only, can test for stepwise also.
+library(ROCR)
+results.lasso<-prediction(fit.pred.lasso, data.test$fracture)#,label.ordering=c("Low","High"))
+roc.lasso = performance(results.lasso, measure = "tpr", x.measure = "fpr")
+plot(roc.lasso,colorize = TRUE)
+abline(a=0, b= 1)
+
+
+#test for stepwise here
+results.step<-prediction(fit.pred.step, data.test$fracture)#,label.ordering=c("Low","High"))
+roc.step = performance(results.step, measure = "tpr", x.measure = "fpr")
+plot(roc.step,colorize = TRUE)
+abline(a=0, b= 1)
+```
