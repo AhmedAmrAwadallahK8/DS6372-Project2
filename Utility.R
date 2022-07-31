@@ -185,8 +185,8 @@ get_and_plot_best_threshold = function(preds, target, pos_class, metric = "f1"){
 }
 
 #Find optimal depth that maximizes balanced accuracy
-find_optimal_depth = function(train, test, fea, tar, d_min=2, d_max=20,  
-                              s_num=10, avg_loop=5, title = "D versus Accuracy for Forest Model"){
+find_optimal_depth = function(train, test, fea, tar, pos_class, d_min=2, d_max=20,  
+                              s_num=10, avg_loop=5, title = "Depth versus Accuracy for Forest Model"){
   #Setup Data Structures for loop logic and output
   d_loop = d_max-d_min+1
   acc_overall = numeric(d_loop)
@@ -208,7 +208,7 @@ find_optimal_depth = function(train, test, fea, tar, d_min=2, d_max=20,
       forest = randomForest(x=train_fea, y=as.factor(train_tar[,]),
                             ntree = 1000, maxnodes = d_current)
       pred_forest = predict(forest, test_fea)
-      CM_rep = confusionMatrix(table(pred_forest, test_tar[,]))
+      CM_rep = confusionMatrix(table(pred_forest, test_tar[,]), positive = pos_class)
       acc = acc + CM_rep$byClass[11]
     }
     #Average across multiple trains
@@ -223,6 +223,53 @@ find_optimal_depth = function(train, test, fea, tar, d_min=2, d_max=20,
   #Plot 
   plot(d_vals, acc_overall, main = title, type = 'l', col = "black", 
        xlab = "d", ylab = "Balanced Accuracy", lwd=3)
+  abline(v = optimal_d, col="#DD1731", lwd=2)
+  
+  return(optimal_d)
+}
+
+#Find optimal depth that maximizes f1 NOT DONE YET
+find_optimal_depth_f1 = function(train, test, fea, tar, pos_class, d_min=2, d_max=20,  
+                              s_num=10, avg_loop=5, title = "Depth versus F1 for Forest Model"){
+  #Setup Data Structures for loop logic and output
+  d_loop = d_max-d_min+1
+  f1_overall = numeric(d_loop)
+  d_vals = c(d_min:d_max)
+  
+  train_fea = train %>% select(contains(fea))
+  train_tar = train %>% select(contains(tar))
+  test_fea = test %>% select(contains(fea))
+  test_tar = test %>% select(contains(tar))
+  #Loop for every d in range specified by parameters dmax-dmin
+  for(j in 1:d_loop){
+    print(j)
+    d_current = d_vals[j]
+    f1_vals_sample = c()
+    f1_tot = 0
+    
+    #Loop multiple times for specified d and take average
+    for(d in 1:avg_loop){
+      forest = randomForest(x=train_fea, y=as.factor(train_tar[,]),
+                            ntree = 1000, maxnodes = d_current)
+      pred_forest = predict(forest, test_fea)
+      CM_rep = confusionMatrix(table(pred_forest, test_tar[,]), positive = pos_class)
+      precision = CM_rep$byClass[5]
+      recall = CM_rep$byClass[6]
+      f1 = get_f1(precision, recall)
+      f1_tot = f1_tot + f1
+    }
+    #Average across multiple trains
+    f1_avg = f1_tot/avg_loop
+    #Add the vector to the overall accruacy vector for all ds
+    f1_overall[j] = f1_overall[j] + f1_avg
+  }
+  
+  #Find Optimal d
+  optimal_d = d_min + which.max(f1_overall) - 1
+  
+  #Plot 
+  plot(d_vals, f1_overall, main = title, type = 'l', col = "black", 
+       xlab = "d", ylab = "F1 Score", lwd=3)
   abline(v = optimal_d, col="#DD1731", lwd=2)
   
   return(optimal_d)

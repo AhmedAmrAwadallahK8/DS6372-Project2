@@ -208,7 +208,7 @@ features = c("phy_id", "priorfrac", "age", "weight", "bmi", "permeno",
 target = c("fracture")
 
 #Find Optimal Depth
-optimal_d = find_optimal_depth(train, test, features, target, d_max=15)
+optimal_d = find_optimal_depth_f1(train, test, features, target, pos_class="Yes", d_max=20)
 
 #Setup train and test data
 train_fea = train %>% select(contains(features))
@@ -229,6 +229,7 @@ auc = plot_roc_and_get_auc_generalized(numeric_preds, test, "fracture")
 #Best Threshold using Balanced Accuracy
 pred_forest = predict(model, test_fea)
 CM_rep = confusionMatrix(table(pred_forest, test$fracture), positive = pos_class)
+CM_rep
 acc = CM_rep$overall[1]
 balanced_acc = CM_rep$byClass[11]
 sens = CM_rep$byClass[1]

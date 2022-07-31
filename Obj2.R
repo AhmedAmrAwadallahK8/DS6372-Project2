@@ -378,7 +378,7 @@ features = c("phy_id", "priorfrac", "age", "weight", "bmi", "permeno",
 target = c("fracture")
 
 #Find Optimal Depth
-optimal_d = find_optimal_depth(train, test, features, target, d_max=30)
+optimal_d = find_optimal_depth_f1(train, test, features, target, pos_class="Yes", d_max=20)
 
 #Setup train and test data
 train_fea = train %>% select(contains(features))

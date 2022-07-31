@@ -132,6 +132,8 @@ glow_bonemed %>% ggplot(aes(x=fracture)) + geom_bar()
 
 #dataset is imbalanced
 
+cts_categ_compare(glow_bonemed, "bmi", "bonemed")
+
 #QDA/LDA Analysis
 str(glow_bonemed)
 cts_vars_and_target = c("phy_id", "age", "weight", "height", "bmi", "fracscore", "fracture")
@@ -139,6 +141,8 @@ glow_bonemed_cts_df = glow_bonemed %>% select(cts_vars_and_target)
 str(glow_bonemed_cts_df)
 
 ggpairs(glow_bonemed_cts_df, columns=1:6, aes(colour=fracture))
+
+ggpairs(glow_bonemed_cts_df, columns=2:5, aes(colour=fracture))
 #Doesnt appear like any variable as a clean linear distinction bounday. Going to consider QDA as my model of choice
 #ggpairs(glow_bonemed,columns = c("momfrac", "armassist", "smoke", "raterisk", "fracscore", "bonemed", "bonemed_fu", "bonetreat"),
 #        columnLabels = c("momfrac", "armassist", "smoke", "raterisk", "fracscore", "bonemed", "bonemed_fu", "bonetreat"),aes(colour=fracture))
