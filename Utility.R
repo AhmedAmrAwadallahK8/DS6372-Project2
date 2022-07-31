@@ -228,7 +228,7 @@ find_optimal_depth = function(train, test, fea, tar, pos_class, d_min=2, d_max=2
   return(optimal_d)
 }
 
-#Find optimal depth that maximizes f1 NOT DONE YET
+#Find optimal depth that maximizes f1
 find_optimal_depth_f1 = function(train, test, fea, tar, pos_class, d_min=2, d_max=20,  
                               s_num=10, avg_loop=5, title = "Depth versus F1 for Forest Model"){
   #Setup Data Structures for loop logic and output
@@ -273,23 +273,3 @@ find_optimal_depth_f1 = function(train, test, fea, tar, pos_class, d_min=2, d_ma
   
   return(optimal_d)
 }
-
-?sample
-ggpair_subset = function(pairs_plot, rows, cols){
-  row_vec = c()
-  col_vec = c()
-  par(mfrow=c(rows,cols))
-  for(row_ind in 1:rows){
-    for(col_ind in 1:cols){
-      print(pairs_plot[row_ind, col_ind])
-      #row_vec = c(row_vec, pairs_plot[row_ind, col_ind])
-    }
-    #col_vec = c(col_vec, row_vec)
-  }
-  #grid.arrange(grobs=list(col_vec), nrow=rows, ncol=cols)
-  #par(mfrow=c(1,1))
-}
-
-
-
-?ggarrange

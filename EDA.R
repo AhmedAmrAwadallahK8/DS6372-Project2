@@ -1,8 +1,5 @@
-#library(dplyr)
-#library(magrittr)
-#library(tidyverse)
-#library(ggplot2)
 library(aplore3)
+library(GGally)
 
 
 #Change working directory to this source file directory
@@ -33,8 +30,6 @@ str(glow_bonemed)
 #bonemed_fu: bone meds at follow up (no, yes)
 #bonetreat: bone med both at enroll and follow (no, yes)
 #fracture: any fracture in first year (no, yes) TARGET
-
-
 
 #Na Check
 percent_na_plot(glow_bonemed)
@@ -132,6 +127,7 @@ glow_bonemed %>% ggplot(aes(x=fracture)) + geom_bar()
 
 #dataset is imbalanced
 
+#Checking relationship with bmi and bonemed as their interaction improved model performance
 cts_categ_compare(glow_bonemed, "bmi", "bonemed")
 
 #QDA/LDA Analysis
@@ -143,27 +139,6 @@ str(glow_bonemed_cts_df)
 ggpairs(glow_bonemed_cts_df, columns=1:6, aes(colour=fracture))
 
 ggpairs(glow_bonemed_cts_df, columns=2:5, aes(colour=fracture))
-#Doesnt appear like any variable as a clean linear distinction bounday. Going to consider QDA as my model of choice
-#ggpairs(glow_bonemed,columns = c("momfrac", "armassist", "smoke", "raterisk", "fracscore", "bonemed", "bonemed_fu", "bonetreat"),
-#        columnLabels = c("momfrac", "armassist", "smoke", "raterisk", "fracscore", "bonemed", "bonemed_fu", "bonetreat"),aes(colour=fracture))
 
-
-
-library(GGally)
-variablesToSelect = c("priorfrac", "age", "momfrac", "armassist", "smoke", "raterisk", "fracscore", "bonemed", "bonemed_fu", "bonetreat", "height", "fracture")
-
-glow_bonemed_subset = glow_bonemed %>% select(variablesToSelect)
-
-
-#ggpairs(glow_bonemed,columns = c("momfrac", "armassist", "smoke", "raterisk", "fracscore", "bonemed", "bonemed_fu", "bonetreat"),
-#        columnLabels = c("momfrac", "armassist", "smoke", "raterisk", "fracscore", "bonemed", "bonemed_fu", "bonetreat"),aes(colour=fracture))
-
-
-pair_plot = ggpairs(glow_bonemed_subset, columns=1:11)
-str(pair_plot[1,1])
-ggpair_subset(pair_plot, 1, 2)
-
-test = glow_bonemed %>% ggplot(aes(x=fracture)) + geom_bar()
-str(test)
-test
-multiplot(pair_plot[1,1])
+#Doesnt appear like any variable as a clean linear distinction boundary. 
+#Going to consider QDA as my model of choice
