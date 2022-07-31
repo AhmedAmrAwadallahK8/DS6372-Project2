@@ -242,7 +242,6 @@ find_optimal_depth_f1 = function(train, test, fea, tar, pos_class, d_min=2, d_ma
   test_tar = test %>% select(contains(tar))
   #Loop for every d in range specified by parameters dmax-dmin
   for(j in 1:d_loop){
-    print(j)
     d_current = d_vals[j]
     f1_vals_sample = c()
     f1_tot = 0

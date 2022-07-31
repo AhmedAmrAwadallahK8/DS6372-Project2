@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-#Setup
+#Import Libs
 library(aplore3)
 library(car)
 library(glmnet)
@@ -23,10 +23,8 @@ setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 source("Utility.r")
 ```
 
-## Data Pre Process
-
-
-```{r cars}
+```{r, include=FALSE}
+#Data Pre Process
 glow_bonemed_raw = glow_bonemed
 
 #Don't need to do much cleaning we know this data is overall fine
@@ -47,13 +45,11 @@ raw_test = train_test_list[[2]]
 raw_train = get_df_with_upsampled_class(raw_train, "fracture", "Yes", 3)
 ```
 
-## Setup Metric Comparison DF
 
-
-```{r pressure, echo=FALSE}
-#Start Model Building Process
-model_compare_df = data.frame(model_num = c(0), model_description = c("Null Model"), auc=c(0), accuracy=c(0), balanced_accuracy=c(0)
-                              , sensitivity=c(0), specificity=c(0), f1_score=c(0))
+```{r pressure, include=FALSE}
+#Setup Comparison Dataframe
+model_compare_df = data.frame(model_num = c(0), model_descrip = c("Null Model"), auc=c(0), accuracy=c(0), balanced_accuracy=c(0)
+                              , sensi=c(0), speci=c(0), f1_score=c(0))
 model_compare_df
 model_num = 0
 
@@ -62,7 +58,20 @@ pos_class = "Yes"
 
 ## Complex Logistic Regression
 
-```{r}
+Strategy: Expand upon the simple logistic model by adding new terms and interactions
+
+Final Model: fracture~
+  age +
+  height + tan(harmonic_height) + tan(harmonic_height):bmi +
+  bmi  + bmi:bonemed +
+  momfrac+
+  armassist+
+  raterisk+
+  bonemed+
+  bonemed_fu +
+  bonetreat
+
+```{r, include=FALSE}
 model_description = "Complex LogReg"
 
 #Var Selection
@@ -109,14 +118,33 @@ model=glm(fracture~
             bonemed_fu +
             bonetreat
           ,family="binomial",data=train)
-summary(model)
 
+```
+#### ROC Plot
+
+The following is the ROC plot for the model. The AUC metric will be shown at the
+end in the metric comparison DF.
+
+```{r, echo=FALSE}
 #Roc and AUC
 auc = plot_roc_and_get_auc(model, test, "fracture")
+```
 
+```{r, include=FALSE}
 #Best Threshold using Balanced Accuracy
 preds = unname(predict(model, test, type="response"))
+```
+
+#### Threshold Plot
+
+This is the plot used to select the threshold that maximize the f1 score for the
+model
+
+```{r, echo=FALSE}
 best_threshold = get_and_plot_best_threshold(preds, test$fracture, pos_class)
+```
+
+```{r, include=FALSE}
 class_preds = ifelse(preds > best_threshold,"Yes","No")
 CM_rep = confusionMatrix(table(class_preds, test$fracture), positive = pos_class)
 acc = CM_rep$overall[1]
@@ -134,8 +162,10 @@ model_compare_df = rbind(model_compare_df, model_stats)
 
 ## PCA and QDA
 
-```{r}
-model_description = "QDA + PC Space"
+Strategy: Build a QDA model with principle components for the same prediction task. 
+
+```{r, echo=FALSE}
+model_description = "QDA + PC"
 
 #Var Selection
 variablesToSelect = c("phy_id", "age", "height", "bmi", "fracscore", "fracture")
@@ -156,7 +186,6 @@ fracture = norm_train$fracture
 train = cbind(train, fracture)
 fracture = norm_test$fracture
 test = cbind(test, fracture)
-print(pc_object)
 #Model
 model_num = model_num + 1
 model=qda(fracture~
@@ -165,12 +194,40 @@ model=qda(fracture~
             PC3+
             PC4,
           family="binomial",data=train)
+```
 
+#### Principle Component Interpretation
+
+PC1 appears to show something about age and fracscore
+
+PC2 focuses more on physician, height and BMI
+
+PC3 is physician and BMI
+
+PC4 is physician, height, BMI, and fracscore
+
+PC5 is age and fracscore again
+
+Overall there is quite a bit of redundancy especially from PC4 and PC5. Hard to
+say what these are exactly representing overall.
+
+```{r, echo=FALSE}
+print(pc_object)
+```
+
+#### ROC
+
+The following is the ROC plot for the model. The AUC metric will be shown at the
+end in the metric comparison DF.
+
+```{r, echo=FALSE}
 #Roc and AUC:
 class_preds=predict(model,newdata=test)$class
 numeric_preds = ifelse(class_preds == "Yes",1,0)
 auc = plot_roc_and_get_auc_generalized(numeric_preds, test, "fracture")
+```
 
+```{r, include=FALSE}
 #Best Threshold using Balanced Accuracy
 class_preds=predict(model,newdata=test)$class
 CM_rep = confusionMatrix(table(class_preds, test$fracture), positive = pos_class)
@@ -189,7 +246,11 @@ model_compare_df = rbind(model_compare_df, model_stats)
 
 ## Random Forest
 
-```{r}
+Strategy: Use a random forest for the prediction task. Plan is to give the model
+all the features present in the dataset as random forest has its own innate
+feature selection. Perhaps it picks something out I couldn't see.
+
+```{r, echo=FALSE}
 model_description = "Random Forest"
 
 #Var Selection
@@ -207,9 +268,20 @@ features = c("phy_id", "priorfrac", "age", "weight", "bmi", "permeno",
              "bonemed", "bonemed_fu", "bonetreat", "height")
 target = c("fracture")
 
-#Find Optimal Depth
-optimal_d = find_optimal_depth_f1(train, test, features, target, pos_class="Yes", d_max=20)
+```
 
+#### Optimal Depth Plot
+
+This is how the depth parameter is optimized. Forest classifiers are trained from
+some minimum depth up to some maximum depth. The depth that gave the best F1 score
+is then selected. The following is a plot visualizing the results.
+
+```{r, echo=FALSE}
+#Find Optimal Depth
+optimal_d = find_optimal_depth_f1(train, test, features, target, pos_class="Yes", d_max=60)
+```
+
+```{r, include=FALSE}
 #Setup train and test data
 train_fea = train %>% select(contains(features))
 train_tar = train %>% select(contains(target))
@@ -220,12 +292,21 @@ test_tar = test %>% select(contains(target))
 model_num = model_num + 1
 model = randomForest(x=train_fea, y=train_tar$fracture,
                       ntree = 1000, maxnodes = optimal_d)
+```
 
+#### ROC
+
+The following is the ROC plot for the model. The AUC metric will be shown at the
+end in the metric comparison DF.
+
+```{r, echo=FALSE}
 #Roc and AUC: Have to make custom func for this
 class_preds = unname(predict(model, test_fea))
 numeric_preds = ifelse(class_preds == "Yes",1,0)
 auc = plot_roc_and_get_auc_generalized(numeric_preds, test, "fracture")
+```
 
+```{r, include=FALSE}
 #Best Threshold using Balanced Accuracy
 pred_forest = predict(model, test_fea)
 CM_rep = confusionMatrix(table(pred_forest, test$fracture), positive = pos_class)
@@ -245,16 +326,17 @@ model_compare_df = rbind(model_compare_df, model_stats)
 
 ## Final Comparison
 
+As we can see the complex logistic regression model did the best, followed by PCA+QDA
+then random forest.
+
 ```{r, echo = FALSE}
 final_model_compare_df = model_compare_df[-1,-1]
 final_model_compare_df$auc = as.numeric(final_model_compare_df$auc)
 final_model_compare_df$accuracy = as.numeric(final_model_compare_df$accuracy)
 final_model_compare_df$balanced_accuracy = as.numeric(final_model_compare_df$balanced_accuracy)
-final_model_compare_df$sensitivity = as.numeric(final_model_compare_df$sensitivity)
-final_model_compare_df$specificity = as.numeric(final_model_compare_df$specificity)
+final_model_compare_df$sensi = as.numeric(final_model_compare_df$sensi)
+final_model_compare_df$speci = as.numeric(final_model_compare_df$speci)
 final_model_compare_df$f1_score = as.numeric(final_model_compare_df$f1_score)
 final_model_compare_df = final_model_compare_df %>% mutate_if(is.numeric, round, digits = 3)
-final_model_compare_df
+grid.table(final_model_compare_df)
 ```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
